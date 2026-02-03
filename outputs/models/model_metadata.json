@@ -1,0 +1,30 @@
+{
+  "selected_model": "XGBoost",
+  "test_auc": 0.6697010808514297,
+  "features": [
+    "loan_amnt",
+    "revenue",
+    "dti_n",
+    "fico_n",
+    "loan_to_income",
+    "income_per_dti",
+    "fico_bucket_num",
+    "emp_length_num",
+    "purpose_car",
+    "purpose_credit_card",
+    "purpose_debt_consolidation",
+    "purpose_home_improvement",
+    "purpose_major_purchase",
+    "purpose_medical",
+    "purpose_moving",
+    "purpose_other",
+    "purpose_small_business",
+    "purpose_vacation",
+    "home_MORTGAGE",
+    "home_OTHER",
+    "home_OWN",
+    "home_RENT"
+  ],
+  "train_samples": 829347,
+  "test_samples": 518333
+}

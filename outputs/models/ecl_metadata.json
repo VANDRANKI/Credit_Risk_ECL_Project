@@ -1,0 +1,10 @@
+{
+  "total_loans": 1347680,
+  "total_ead": 19417693475.0,
+  "total_ecl": 4284450663.241666,
+  "portfolio_ecl_rate": 22.064673483273562,
+  "agricultural_ecl": 25582032.01310903,
+  "agricultural_ecl_rate": 28.118202493900775,
+  "non_agricultural_ecl": 4258868631.2285566,
+  "non_agricultural_ecl_rate": 22.03617655094424
+}

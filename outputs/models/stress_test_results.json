@@ -1,0 +1,34 @@
+{
+  "Baseline": {
+    "total_ecl": 4284450663.241666,
+    "total_ecl_change": 0.0,
+    "agri_ecl": 25582032.01310903,
+    "agri_ecl_change": 0.0,
+    "non_agri_ecl": 4258868631.2285566,
+    "non_agri_ecl_change": 0.0
+  },
+  "Moderate Stress": {
+    "total_ecl": 5065618784.684196,
+    "total_ecl_change": 18.232631971807784,
+    "agri_ecl": 30235098.383569166,
+    "agri_ecl_change": 18.18880676904697,
+    "non_agri_ecl": 5035383686.300632,
+    "non_agri_ecl_change": 18.232895219594376
+  },
+  "Severe Stress": {
+    "total_ecl": 5864889775.728183,
+    "total_ecl_change": 36.88778881376447,
+    "agri_ecl": 34153372.54388,
+    "agri_ecl_change": 33.50531547446563,
+    "non_agri_ecl": 5830736403.184304,
+    "non_agri_ecl_change": 36.90810654336409
+  },
+  "Agricultural Crisis": {
+    "total_ecl": 6175388146.333705,
+    "total_ecl_change": 44.13488756715741,
+    "agri_ecl": 35276883.16143093,
+    "agri_ecl_change": 37.89711131372974,
+    "non_agri_ecl": 6140111263.172272,
+    "non_agri_ecl_change": 44.17235643638608
+  }
+}

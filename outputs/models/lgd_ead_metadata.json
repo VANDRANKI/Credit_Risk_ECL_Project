@@ -1,0 +1,9 @@
+{
+  "lgd_assumption": 0.45,
+  "lgd_method": "Fixed 45% (Basel II Foundation IRB Standard)",
+  "ead_method": "Loan Amount (Conservative)",
+  "total_portfolio_ead": 19417693475.0,
+  "mean_ead": 14408.23747106138,
+  "median_ead": 12000.0,
+  "total_loans": 1347680
+}
