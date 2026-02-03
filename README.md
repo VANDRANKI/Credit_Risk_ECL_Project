@@ -236,7 +236,7 @@ This project aligns with:
 ## Author
 
 **Prabhu**
-- Quantitative Risk Analyst
+- Data Specialist | Quantitative Risk Analyst
 - Credit Risk Modeling | CECL | Stress Testing
 
 ## License
