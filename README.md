@@ -20,36 +20,61 @@ This project implements an end-to-end **CECL (Current Expected Credit Losses)** 
 
 ```
 Credit_Risk_Personal_Project/
-│
-├── data_raw/                              # Source data
-│   └── LC_loans_granting_model_dataset.csv
-│
-├── data_processed/                        # Processed data files
-│   ├── loans_cleaned.csv
-│   ├── loans_with_agri_flag.csv
-│   ├── loans_with_pd.csv
-│   ├── loans_with_lgd_ead.csv
-│   └── loans_with_ecl.csv
-│
-├── notebooks/                             # Jupyter notebooks
-│   ├── 01_Data_Acquisition_EDA.ipynb
-│   ├── 02_Agricultural_Portfolio_Segmentation.ipynb
-│   ├── 03_PD_Model_Development.ipynb
-│   ├── 04_LGD_EAD_Estimation.ipynb
-│   ├── 05_ECL_Computation.ipynb
-│   └── 06_Stress_Testing.ipynb
-│
-├── outputs/
-│   ├── figures/                           # Generated visualizations
-│   └── models/                            # Saved models and metadata
-│
-├── docs/                                  # Documentation
-│   ├── Model_Development_Document.md
-│   └── Executive_Summary.md
-│
-├── requirements.txt                       # Python dependencies
-├── README.md                              # This file
-└── PROJECT_PLAN_CECL_AGRI_PORTFOLIO.md   # Original project plan
+|-- data_raw/                         # Source data
+|   |-- LC_loans_granting_model_dataset.csv
+|-- data_processed/                   # Cleaned and transformed data
+|   |-- loans_cleaned.csv
+|   |-- loans_with_agri_flag.csv
+|   |-- loans_with_pd.csv
+|   |-- loans_with_lgd_ead.csv
+|   |-- loans_with_ecl.csv
+|-- notebooks/                        # Jupyter notebooks
+|   |-- 01_Data_Acquisition_EDA.ipynb
+|   |-- 02_Agricultural_Portfolio_Segmentation.ipynb
+|   |-- 03_PD_Model_Development.ipynb
+|   |-- 04_LGD_EAD_Estimation.ipynb
+|   |-- 05_ECL_Computation.ipynb
+|   |-- 06_Stress_Testing.ipynb
+|   |-- 07_SHAP_Feature_Importance.ipynb
+|-- outputs/
+|   |-- figures/                      # Visualizations (PNG plots)
+|   |-- models/                       # Saved models and metadata
+|   |   |-- ecl_metadata.json
+|   |   |-- feature_scaler.joblib
+|   |   |-- lgd_ead_metadata.json
+|   |   |-- model_metadata.json
+|   |   |-- pd_model_logistic.joblib
+|   |   |-- pd_model_selected.joblib
+|   |   |-- pd_model_xgboost.joblib
+|   |   |-- stress_test_results.json
+|   |-- stress_test_summary.csv
+|-- src/                              # Core pipeline modules
+|   |-- __init__.py
+|   |-- data_processing.py
+|   |-- ecl_calculator.py
+|   |-- feature_engineering.py
+|   |-- modeling.py
+|   |-- stress_testing.py
+|   |-- visualization.py
+|-- tests/                            # Unit tests
+|   |-- __init__.py
+|   |-- conftest.py
+|   |-- test_data_processing.py
+|   |-- test_ecl_calculator.py
+|   |-- test_feature_engineering.py
+|   |-- test_modeling.py
+|   |-- test_stress_testing.py
+|-- docs/                             # Documentation
+|   |-- Executive_Summary.md
+|   |-- Model_Card.md
+|   |-- Model_Development_Document.md
+|-- .gitignore
+|-- pytest.ini
+|-- README.md
+|-- requirements.txt
+|-- run_analysis.py
+|-- .pytest_cache/                    # Auto-generated
+|-- __pycache__/                      # Auto-generated
 ```
 
 ## Dataset
