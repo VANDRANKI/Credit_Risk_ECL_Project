@@ -251,4 +251,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-*This project was developed as a demonstration of credit risk modeling capabilities for quantitative risk analyst roles.*
+*This project was developed as a demonstration of credit risk modeling capabilities for agricultural loan portfolio segments.*
