@@ -214,7 +214,6 @@ Each notebook produces:
 |----------|-------------|
 | [Model Development Document](docs/Model_Development_Document.md) | Technical methodology, validation, and governance |
 | [Executive Summary](docs/Executive_Summary.md) | High-level findings for leadership |
-| [Project Plan](PROJECT_PLAN_CECL_AGRI_PORTFOLIO.md) | Original project requirements |
 
 ## Skills Demonstrated
 
