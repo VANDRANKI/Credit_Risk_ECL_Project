@@ -406,8 +406,10 @@ for scenario_name, params in SCENARIOS.items():
     if scenario_name == 'Baseline':
         pd_stressed = df['pd_hat'].copy()
     else:
-        # Calculate PD multiplier
-        pd_multiplier = (1 - income_change) * (1 + abs(dti_change) * 0.5)
+        # Calculate PD multiplier. dti_change's sign is meaningful (positive
+        # = deterioration, negative = improvement); abs() would treat a DTI
+        # improvement as risk-increasing instead of risk-reducing.
+        pd_multiplier = (1 - income_change) * (1 + dti_change * 0.5)
         pd_stressed = (df['pd_hat'] * pd_multiplier).clip(upper=0.95)
 
     # Calculate stressed ECL

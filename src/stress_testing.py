@@ -51,15 +51,20 @@ def calculate_pd_multiplier(
     income_change : float
         Percentage change in income (negative for decline).
     dti_change : float
-        Percentage change in DTI (positive for increase).
+        Percentage change in DTI (positive for increase, negative for
+        improvement).
 
     Returns
     -------
     float
         PD multiplier.
     """
-    # PD increases when income falls and DTI rises
-    multiplier = (1 - income_change) * (1 + abs(dti_change) * 0.5)
+    # PD increases when income falls and DTI rises, and decreases when
+    # income grows and DTI falls. abs(dti_change) would treat a DTI
+    # improvement (negative dti_change) as risk-increasing instead of
+    # risk-reducing, which silently erases the benefit of a recovery
+    # scenario (e.g. income up, DTI down).
+    multiplier = (1 - income_change) * (1 + dti_change * 0.5)
 
     return multiplier
 

@@ -10,11 +10,53 @@ import pandas as pd
 import numpy as np
 from src.stress_testing import (
     apply_stress_scenario,
+    apply_stress_to_pd,
+    calculate_pd_multiplier,
     calculate_stressed_ecl,
     calculate_ecl_change,
     run_stress_test_suite,
     calculate_segment_stress_impact
 )
+
+
+class TestCalculatePdMultiplier:
+    """Tests for calculate_pd_multiplier. dti_change's sign is meaningful:
+    positive means DTI deteriorated (more risk), negative means DTI
+    improved (less risk). A prior version took abs(dti_change), which
+    treated an improvement identically to a deterioration of the same
+    size -- silently erasing the risk-reducing effect of any recovery
+    scenario (income up, DTI down)."""
+
+    def test_stress_scenario_increases_pd(self):
+        """Income down, DTI up (both point toward higher risk)."""
+        multiplier = calculate_pd_multiplier(income_change=-0.10, dti_change=0.15)
+        assert multiplier > 1.0
+
+    def test_recovery_scenario_decreases_pd(self):
+        """Income up, DTI down (both point toward lower risk): the
+        multiplier must go below 1.0, not sit near 1.0."""
+        multiplier = calculate_pd_multiplier(income_change=0.05, dti_change=-0.10)
+        assert multiplier < 1.0
+        # With the sign bug, abs(-0.10) produced a multiplier of 0.9975 --
+        # barely different from no stress at all, despite both inputs
+        # improving. The correct multiplier compounds both effects.
+        expected = (1 - 0.05) * (1 + (-0.10) * 0.5)
+        assert multiplier == pytest.approx(expected)
+        assert multiplier == pytest.approx(0.9025)
+
+    def test_baseline_is_neutral(self):
+        assert calculate_pd_multiplier(0.0, 0.0) == pytest.approx(1.0)
+
+
+class TestApplyStressToPd:
+    def test_recovery_scenario_reduces_pd_below_baseline(self):
+        """apply_stress_to_pd must let PD fall below the unstressed value
+        when both income and DTI move in the favorable direction."""
+        df = pd.DataFrame({'pd_hat': [0.10, 0.20]})
+
+        result = apply_stress_to_pd(df.copy(), income_change=0.05, dti_change=-0.10)
+
+        assert (result['pd_stressed'] < df['pd_hat']).all()
 
 
 class TestApplyStressScenario:
