@@ -12,7 +12,8 @@ from src.data_processing import (
     validate_dataframe,
     clean_numeric_column,
     handle_missing_values,
-    create_time_split
+    create_time_split,
+    create_fico_buckets
 )
 
 
@@ -81,6 +82,40 @@ class TestHandleMissingValues:
         df = pd.DataFrame({'value': [1.0, np.nan, 3.0]})
         result = handle_missing_values(df.copy(), 'value', strategy='constant', fill_value=0)
         assert result['value'].iloc[1] == 0
+
+
+class TestCreateFicoBuckets:
+    """Tests for create_fico_buckets function."""
+
+    def test_minimum_score_is_bucketed(self):
+        """FICO score of exactly 300 (the valid minimum) must land in the
+        '300-579' bucket, not fall through to NaN.
+
+        pd.cut's default bins are (left, right], so without
+        include_lowest=True, a value equal to the leftmost bin edge (300)
+        is excluded from every bin and becomes NaN.
+        """
+        df = pd.DataFrame({'fico_n': [300, 579, 580, 850]})
+        result = create_fico_buckets(df.copy())
+
+        assert result['fico_bucket'].isna().sum() == 0
+        assert result.loc[result['fico_n'] == 300, 'fico_bucket'].iloc[0] == '300-579'
+
+    def test_bucket_boundaries(self):
+        """Spot-check bucket assignment across all boundary values."""
+        df = pd.DataFrame({'fico_n': [300, 579, 580, 619, 620, 850]})
+        result = create_fico_buckets(df.copy())
+
+        expected = {
+            300: '300-579',
+            579: '300-579',
+            580: '580-619',
+            619: '580-619',
+            620: '620-659',
+            850: '780-850',
+        }
+        for fico, bucket in expected.items():
+            assert result.loc[result['fico_n'] == fico, 'fico_bucket'].iloc[0] == bucket
 
 
 class TestCreateTimeSplit:

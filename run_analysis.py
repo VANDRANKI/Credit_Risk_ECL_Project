@@ -85,10 +85,17 @@ df['issue_year'] = df['issue_date'].dt.year
 df['issue_month'] = df['issue_date'].dt.month
 
 # Create FICO buckets
+# include_lowest=True: pd.cut bins are (left, right] by default, so a score
+# of exactly 300 (the valid minimum kept by the `fico_n >= 300` filter above)
+# would otherwise fall outside every bin and come out as NaN instead of
+# '300-579' -- which later gets silently reclassified into the middle bucket
+# (fico_bucket_num=4) by the fillna(4) default, treating a worst-possible
+# credit score as an average one.
 df['fico_bucket'] = pd.cut(df['fico_n'],
                            bins=[300, 579, 619, 659, 699, 739, 779, 850],
                            labels=['300-579', '580-619', '620-659', '660-699',
-                                   '700-739', '740-779', '780-850'])
+                                   '700-739', '740-779', '780-850'],
+                           include_lowest=True)
 
 # Create income buckets
 df['income_bucket'] = pd.cut(df['revenue'],

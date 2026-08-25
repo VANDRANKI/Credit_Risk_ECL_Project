@@ -226,7 +226,11 @@ def create_fico_buckets(
               '700-739', '740-779', '780-850']
 
     df = df.copy()
-    df[output_column] = pd.cut(df[column], bins=bins, labels=labels)
+    # include_lowest=True: pd.cut bins are (left, right] by default, so a
+    # score of exactly 300 (the valid minimum, explicitly allowed by
+    # validate_fico_scores' `>= min_score` check) would otherwise fall
+    # outside every bin and come out as NaN instead of '300-579'.
+    df[output_column] = pd.cut(df[column], bins=bins, labels=labels, include_lowest=True)
 
     return df
 
