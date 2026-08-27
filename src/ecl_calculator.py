@@ -368,7 +368,13 @@ def create_pd_bands(
     bins = [0, 0.05, 0.10, 0.15, 0.20, 0.30, 1.0]
     labels = ['0-5%', '5-10%', '10-15%', '15-20%', '20-30%', '>30%']
 
-    df[output_col] = pd.cut(df[pd_col], bins=bins, labels=labels)
+    # include_lowest=True: pd.cut bins are (left, right] by default, so a
+    # loan with a predicted PD of exactly 0.0 (the valid minimum -- e.g. a
+    # borrower whose model score got floored/clipped to zero) would
+    # otherwise fall outside every bin and come out as NaN instead of
+    # '0-5%', silently dropping it from any pd_band-based segmentation or
+    # aggregation (used in the ECL computation notebook).
+    df[output_col] = pd.cut(df[pd_col], bins=bins, labels=labels, include_lowest=True)
 
     return df
 

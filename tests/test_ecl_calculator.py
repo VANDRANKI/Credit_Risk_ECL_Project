@@ -13,7 +13,8 @@ from src.ecl_calculator import (
     calculate_lgd,
     calculate_ecl,
     aggregate_ecl_by_segment,
-    calculate_portfolio_ecl_rate
+    calculate_portfolio_ecl_rate,
+    create_pd_bands
 )
 
 
@@ -145,6 +146,41 @@ class TestAggregateECLBySegment:
         result = aggregate_ecl_by_segment(sample_ecl_data, 'is_agri_portfolio', 'ecl_est')
 
         assert result.sum() == sample_ecl_data['ecl_est'].sum()
+
+
+class TestCreatePdBands:
+    """Tests for create_pd_bands function.
+
+    pd.cut's default bins are (left, right], so a PD of exactly 0.0 (the
+    valid minimum -- e.g. a model score floored/clipped to zero) falls
+    outside every bin and comes out as NaN instead of '0-5%' unless
+    include_lowest=True is passed. This mirrors the same class of boundary
+    bug already fixed for FICO buckets in create_fico_buckets.
+    """
+
+    def test_minimum_pd_is_banded(self):
+        """A PD of exactly 0.0 must land in the '0-5%' band, not NaN."""
+        df = pd.DataFrame({'pd_hat': [0.0, 0.03, 0.5, 0.99]})
+        result = create_pd_bands(df.copy())
+
+        assert result['pd_band'].isna().sum() == 0
+        assert result.loc[result['pd_hat'] == 0.0, 'pd_band'].iloc[0] == '0-5%'
+
+    def test_band_boundaries(self):
+        """Spot-check band assignment across all boundary values."""
+        df = pd.DataFrame({'pd_hat': [0.0, 0.05, 0.10, 0.20, 0.30, 1.0]})
+        result = create_pd_bands(df.copy())
+
+        expected = {
+            0.0: '0-5%',
+            0.05: '0-5%',
+            0.10: '5-10%',
+            0.20: '15-20%',
+            0.30: '20-30%',
+            1.0: '>30%',
+        }
+        for pd_val, band in expected.items():
+            assert result.loc[result['pd_hat'] == pd_val, 'pd_band'].iloc[0] == band
 
 
 class TestCalculatePortfolioECLRate:
