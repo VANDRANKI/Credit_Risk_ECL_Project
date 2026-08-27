@@ -100,8 +100,14 @@ def apply_stress_scenario(
     # Apply PD stress
     df['pd_stressed'] = df['pd_hat'] * pd_multiplier
 
-    # Apply agricultural-specific stress if specified
-    if agri_col and agri_pd_multiplier:
+    # Apply agricultural-specific stress if specified. Must check
+    # `is not None` rather than plain truthiness: an explicit
+    # agri_pd_multiplier of 0.0 (e.g. a relief/guarantee scenario that
+    # zeroes out agricultural default risk) is a legitimate scenario
+    # value, but `and agri_pd_multiplier` treats 0.0 the same as "not
+    # provided" and silently falls back to the portfolio-wide
+    # pd_multiplier instead.
+    if agri_col and agri_pd_multiplier is not None:
         agri_mask = df[agri_col] == 1
         df.loc[agri_mask, 'pd_stressed'] = df.loc[agri_mask, 'pd_hat'] * agri_pd_multiplier
 

@@ -116,6 +116,34 @@ class TestApplyStressScenario:
         # Agricultural loan should have higher stress
         assert result['pd_stressed'].iloc[0] > result['pd_stressed'].iloc[1]
 
+    def test_agri_multiplier_of_zero_is_honored(self):
+        """An explicit agri_pd_multiplier of 0.0 (e.g. a relief/guarantee
+        scenario that zeroes out agricultural default risk) must actually
+        zero out the agricultural loan's stressed PD, not silently fall
+        back to the portfolio-wide pd_multiplier.
+
+        `if agri_col and agri_pd_multiplier:` treats 0.0 as falsy, which
+        is indistinguishable from the key being absent -- this is the
+        bug being guarded against here.
+        """
+        df = pd.DataFrame({
+            'pd_hat': [0.10, 0.10],
+            'is_agri_portfolio': [1, 0]
+        })
+        scenario = {
+            'pd_multiplier': 1.25,
+            'lgd_add': 0.0,
+            'agri_pd_multiplier': 0.0
+        }
+
+        result = apply_stress_scenario(df.copy(), scenario, agri_col='is_agri_portfolio')
+
+        # Agricultural loan's PD must be zeroed out by the explicit 0.0
+        # multiplier, while the non-agricultural loan still gets the
+        # portfolio-wide 1.25x multiplier.
+        assert result['pd_stressed'].iloc[0] == 0.0
+        assert result['pd_stressed'].iloc[1] == pytest.approx(0.125)
+
 
 class TestCalculateStressedECL:
     """Tests for calculate_stressed_ecl function."""
