@@ -15,7 +15,8 @@ from src.modeling import (
     train_xgboost,
     evaluate_model,
     get_feature_importance,
-    select_best_model
+    select_best_model,
+    time_based_split
 )
 
 
@@ -162,3 +163,50 @@ class TestSelectBestModel:
         best_name, best_info = select_best_model(models, metric='auc')
 
         assert best_name == 'only_model'
+
+
+class TestTimeBasedSplit:
+    """Tests for time_based_split function."""
+
+    def test_normal_multi_year_split(self):
+        """Sanity check: a balanced multi-year dataset splits without error
+        and roughly respects the requested train ratio."""
+        df = pd.DataFrame({
+            'issue_year': [2016] * 40 + [2017] * 30 + [2018] * 30
+        })
+
+        train_mask, test_mask = time_based_split(df, year_column='issue_year', train_ratio=0.7)
+
+        assert train_mask.sum() + test_mask.sum() == len(df)
+        assert train_mask.sum() > 0
+        assert test_mask.sum() > 0
+
+    def test_single_year_dataset_does_not_crash(self):
+        """A dataset covering a single issue year (e.g. one loan vintage)
+        means every row shares one year value, so its cumulative count
+        (100% of the data) always exceeds `len(df) * train_ratio` for any
+        train_ratio < 1. `year_counts[year_counts <= split_threshold]` is
+        then empty, and indexing it with `.index[-1]` raised an
+        IndexError instead of falling back to a valid split.
+        """
+        df = pd.DataFrame({'issue_year': [2020] * 50})
+
+        train_mask, test_mask = time_based_split(df, year_column='issue_year', train_ratio=0.7)
+
+        assert train_mask.sum() + test_mask.sum() == len(df)
+        assert train_mask.all()
+        assert not test_mask.any()
+
+    def test_dominant_early_year_does_not_crash(self):
+        """Same root cause as the single-year case, but reached with more
+        than one distinct year present: if the earliest year's share of
+        records alone already exceeds train_ratio, no year's cumulative
+        count qualifies and the same IndexError was raised."""
+        df = pd.DataFrame({
+            'issue_year': [2016] * 80 + [2017] * 15 + [2018] * 5
+        })
+
+        train_mask, test_mask = time_based_split(df, year_column='issue_year', train_ratio=0.5)
+
+        assert train_mask.sum() + test_mask.sum() == len(df)
+        assert train_mask.sum() > 0

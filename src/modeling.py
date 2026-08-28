@@ -54,7 +54,18 @@ def time_based_split(
     """
     year_counts = df.groupby(year_column).size().cumsum()
     split_threshold = len(df) * train_ratio
-    split_year = year_counts[year_counts <= split_threshold].index[-1]
+
+    # Pick the latest year whose cumulative count still fits under the
+    # train ratio threshold. If the earliest year alone already exceeds
+    # the threshold (e.g. a single-vintage dataset, or one cohort year
+    # dominating volume), no year qualifies and `.index[-1]` on the
+    # empty result raises an IndexError. Fall back to the earliest year
+    # so we still get a valid (if degenerate) split instead of crashing.
+    qualifying_years = year_counts[year_counts <= split_threshold].index
+    if len(qualifying_years) > 0:
+        split_year = qualifying_years[-1]
+    else:
+        split_year = year_counts.index[0]
 
     train_mask = df[year_column] <= split_year
     test_mask = df[year_column] > split_year
