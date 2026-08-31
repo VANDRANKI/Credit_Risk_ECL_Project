@@ -208,9 +208,19 @@ X = df[ALL_FEATURES].copy()
 y = df['Default'].copy()
 
 # Time-based split
+#
+# This is the same inline logic as src/modeling.py's time_based_split(),
+# which was fixed for the same IndexError (see that function's comment):
+# if the earliest year alone already exceeds the 70% threshold -- a single
+# vintage dominating volume -- no year satisfies `<= split_threshold`, and
+# `.index[-1]` on the resulting empty Index raises IndexError. This inline
+# copy in the script never got the same fix, so it still crashed. Falls
+# back to the earliest year so the script still produces a valid (if
+# degenerate) split instead of crashing.
 year_counts = df.groupby('issue_year').size().cumsum()
 split_threshold = len(df) * 0.70
-split_year = year_counts[year_counts <= split_threshold].index[-1]
+qualifying_years = year_counts[year_counts <= split_threshold].index
+split_year = qualifying_years[-1] if len(qualifying_years) > 0 else year_counts.index[0]
 
 train_mask = df['issue_year'] <= split_year
 test_mask = df['issue_year'] > split_year
