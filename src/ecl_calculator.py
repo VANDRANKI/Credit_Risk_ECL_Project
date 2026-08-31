@@ -289,13 +289,23 @@ def get_segment_ecl_summary(
     pd.DataFrame
         ECL summary by segment.
     """
-    summary = df.groupby(segment_col).agg(
-        loan_count=('id', 'count') if 'id' in df.columns else (ecl_col, 'count'),
-        total_ead=(ead_col, 'sum'),
-        total_ecl=(ecl_col, 'sum'),
-        mean_pd=(pd_col, 'mean'),
-        actual_default_rate=(default_col, 'mean')
-    )
+    # get_portfolio_ecl_summary (above) guards this same default_col='Default'
+    # default with `if default_col in df.columns else None`, but this
+    # function passed it straight to .agg() unconditionally. Any caller
+    # without a 'Default' column -- the normal case pre-actuals, e.g.
+    # scoring a live portfolio with no realized outcomes yet -- got a
+    # KeyError: "Column(s) ['Default'] do not exist" instead of a summary
+    # with actual_default_rate simply absent.
+    agg_spec = {
+        'loan_count': ('id', 'count') if 'id' in df.columns else (ecl_col, 'count'),
+        'total_ead': (ead_col, 'sum'),
+        'total_ecl': (ecl_col, 'sum'),
+        'mean_pd': (pd_col, 'mean'),
+    }
+    if default_col in df.columns:
+        agg_spec['actual_default_rate'] = (default_col, 'mean')
+
+    summary = df.groupby(segment_col).agg(**agg_spec)
 
     summary['ecl_rate'] = summary['total_ecl'] / summary['total_ead'] * 100
     summary['ead_pct'] = summary['total_ead'] / summary['total_ead'].sum() * 100

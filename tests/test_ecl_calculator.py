@@ -14,7 +14,8 @@ from src.ecl_calculator import (
     calculate_ecl,
     aggregate_ecl_by_segment,
     calculate_portfolio_ecl_rate,
-    create_pd_bands
+    create_pd_bands,
+    get_segment_ecl_summary,
 )
 
 
@@ -181,6 +182,46 @@ class TestCreatePdBands:
         }
         for pd_val, band in expected.items():
             assert result.loc[result['pd_hat'] == pd_val, 'pd_band'].iloc[0] == band
+
+
+class TestGetSegmentECLSummary:
+    """Tests for get_segment_ecl_summary function.
+
+    Regression: the groupby().agg() call passed default_col='Default'
+    straight through unconditionally, unlike get_portfolio_ecl_summary's
+    own default_col handling which checks `if default_col in df.columns`
+    first. Any dataframe without a 'Default' column -- the normal case for
+    a live portfolio scored before outcomes are known -- raised
+    KeyError: "Column(s) ['Default'] do not exist" instead of returning a
+    summary with actual_default_rate simply omitted.
+    """
+
+    def test_summary_without_default_column_does_not_raise(self):
+        df = pd.DataFrame({
+            'segment': ['A', 'A', 'B'],
+            'ecl_est': [10, 20, 30],
+            'ead_est': [100, 200, 300],
+            'pd_hat': [0.1, 0.2, 0.3],
+        })
+        result = get_segment_ecl_summary(df, segment_col='segment')
+
+        assert 'actual_default_rate' not in result.columns
+        assert result.loc['A', 'total_ecl'] == 30
+        assert result.loc['B', 'total_ecl'] == 30
+
+    def test_summary_with_default_column_includes_default_rate(self):
+        df = pd.DataFrame({
+            'segment': ['A', 'A', 'B'],
+            'ecl_est': [10, 20, 30],
+            'ead_est': [100, 200, 300],
+            'pd_hat': [0.1, 0.2, 0.3],
+            'Default': [0, 1, 0],
+        })
+        result = get_segment_ecl_summary(df, segment_col='segment')
+
+        assert 'actual_default_rate' in result.columns
+        assert result.loc['A', 'actual_default_rate'] == 0.5
+        assert result.loc['B', 'actual_default_rate'] == 0.0
 
 
 class TestCalculatePortfolioECLRate:
