@@ -1,5 +1,6 @@
 # CECL Credit Risk Modeling and Stress Testing for Agricultural Loan Portfolio
 
+[![Pylint](https://github.com/VANDRANKI/Credit_Risk_ECL_Project/actions/workflows/pylint.yml/badge.svg?branch=main)](https://github.com/VANDRANKI/Credit_Risk_ECL_Project/actions/workflows/pylint.yml)
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Complete-success.svg)]()
