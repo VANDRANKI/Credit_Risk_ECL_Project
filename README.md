@@ -169,8 +169,8 @@ Portfolio-level ECL aggregated by segment for CECL provisioning.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/cecl-agri-credit-risk.git
-cd cecl-agri-credit-risk
+git clone https://github.com/VANDRANKI/Credit_Risk_ECL_Project.git
+cd Credit_Risk_ECL_Project
 ```
 
 2. Create virtual environment:
