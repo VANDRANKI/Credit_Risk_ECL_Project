@@ -181,8 +181,7 @@ def train_xgboost(
             colsample_bytree=0.8,
             scale_pos_weight=scale_pos_weight,
             random_state=random_state,
-            eval_metric='auc',
-            use_label_encoder=False
+            eval_metric='auc'
         )
     else:
         model = RandomForestClassifier(

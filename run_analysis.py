@@ -257,8 +257,7 @@ if XGB_AVAILABLE:
         n_estimators=200, max_depth=6, learning_rate=0.1,
         subsample=0.8, colsample_bytree=0.8,
         scale_pos_weight=scale_pos_weight,
-        random_state=RANDOM_STATE, eval_metric='auc',
-        use_label_encoder=False
+        random_state=RANDOM_STATE, eval_metric='auc'
     )
     MODEL_NAME = 'XGBoost'
 else:
