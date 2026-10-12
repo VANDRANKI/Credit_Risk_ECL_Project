@@ -15,7 +15,14 @@ from src.stress_testing import (
     calculate_stressed_ecl,
     calculate_ecl_change,
     run_stress_test_suite,
-    calculate_segment_stress_impact
+    calculate_segment_stress_impact,
+    run_stress_scenario,
+    run_all_scenarios,
+    calculate_stress_changes,
+    get_stress_summary_table,
+    calculate_incremental_ecl,
+    assess_portfolio_vulnerability,
+    DEFAULT_SCENARIOS
 )
 
 
@@ -263,3 +270,112 @@ class TestCalculateSegmentStressImpact:
 
         # Should have results for both segments (0 and 1)
         assert len(result) >= 1
+
+
+@pytest.fixture
+def small_portfolio():
+    """Two agricultural and two other loans with round numbers."""
+    return pd.DataFrame({
+        'pd_hat': [0.10, 0.10, 0.10, 0.10],
+        'lgd_est': [0.5, 0.5, 0.5, 0.5],
+        'ead_est': [1000.0, 1000.0, 3000.0, 3000.0],
+        'is_agri_portfolio': [1, 1, 0, 0],
+    })
+
+
+class TestRunStressScenario:
+
+    def test_baseline_totals(self, small_portfolio):
+        res = run_stress_scenario(small_portfolio, 'Baseline', DEFAULT_SCENARIOS['Baseline'])
+        assert res['total_ead'] == 8000.0
+        assert res['total_ecl'] == pytest.approx(0.10 * 0.5 * 8000.0)
+        assert res['ecl_rate'] == pytest.approx(5.0)
+        assert res['mean_pd_stressed'] == pytest.approx(0.10)
+
+    def test_segment_totals_split_the_portfolio(self, small_portfolio):
+        res = run_stress_scenario(small_portfolio, 'Baseline', DEFAULT_SCENARIOS['Baseline'])
+        assert res['agri_ead'] == 2000.0
+        assert res['non_agri_ead'] == 6000.0
+        assert res['agri_ecl'] + res['non_agri_ecl'] == pytest.approx(res['total_ecl'])
+        assert res['agri_ecl_rate'] == pytest.approx(5.0)
+
+    def test_segment_keys_are_absent_without_the_segment_column(self, small_portfolio):
+        res = run_stress_scenario(
+            small_portfolio.drop(columns='is_agri_portfolio'), 'Baseline',
+            DEFAULT_SCENARIOS['Baseline'],
+        )
+        assert 'agri_ecl' not in res
+
+    def test_stress_raises_ecl_and_does_not_modify_the_input(self, small_portfolio):
+        before = small_portfolio.copy()
+        base = run_stress_scenario(small_portfolio, 'Baseline', DEFAULT_SCENARIOS['Baseline'])
+        severe = run_stress_scenario(small_portfolio, 'Severe Stress', DEFAULT_SCENARIOS['Severe Stress'])
+        assert severe['total_ecl'] > base['total_ecl']
+        pd.testing.assert_frame_equal(small_portfolio, before)
+
+    def test_pd_multiplier_matches_the_formula(self, small_portfolio):
+        params = {'income_change': -0.10, 'dti_change': 0.15}
+        res = run_stress_scenario(small_portfolio, 'x', params)
+        assert res['mean_pd_stressed'] == pytest.approx(0.10 * (1.10) * (1 + 0.15 * 0.5))
+
+
+@pytest.fixture
+def suite_results(small_portfolio):
+    return calculate_stress_changes(run_all_scenarios(small_portfolio))
+
+
+class TestScenarioSuite:
+
+    def test_one_result_per_default_scenario(self, suite_results):
+        assert list(suite_results) == list(DEFAULT_SCENARIOS)
+
+    def test_baseline_change_is_zero_and_stress_is_positive(self, suite_results):
+        assert suite_results['Baseline']['total_ecl_change'] == 0
+        assert suite_results['Moderate Stress']['total_ecl_change'] > 0
+        assert (
+            suite_results['Agricultural Crisis']['total_ecl_change']
+            > suite_results['Severe Stress']['total_ecl_change']
+        )
+
+    def test_segment_changes_are_added(self, suite_results):
+        assert 'agri_ecl_change' in suite_results['Severe Stress']
+        assert 'non_agri_ecl_change' in suite_results['Severe Stress']
+
+    def test_summary_table_has_one_row_per_scenario(self, suite_results):
+        table = get_stress_summary_table(suite_results)
+        assert table['Scenario'].tolist() == list(DEFAULT_SCENARIOS)
+        assert {'Total ECL', 'ECL Rate (%)', 'ECL Change (%)', 'Agri ECL'} <= set(table.columns)
+
+    def test_summary_table_without_changes_defaults_to_zero(self, small_portfolio):
+        table = get_stress_summary_table(run_all_scenarios(small_portfolio))
+        assert (table['ECL Change (%)'] == 0).all()
+
+    def test_incremental_ecl_is_relative_to_baseline(self, suite_results):
+        inc = calculate_incremental_ecl(suite_results)
+        assert inc['Baseline'] == 0
+        assert inc['Severe Stress'] == pytest.approx(
+            suite_results['Severe Stress']['total_ecl'] - suite_results['Baseline']['total_ecl']
+        )
+
+    def test_vulnerability_picks_the_worst_scenario(self, suite_results):
+        a = assess_portfolio_vulnerability(suite_results)
+        assert a['worst_scenario'] == 'Agricultural Crisis'
+        assert a['max_incremental_ecl'] == pytest.approx(
+            a['worst_ecl'] - a['baseline_ecl']
+        )
+        assert a['baseline_ecl_rate'] == pytest.approx(5.0)
+        assert 'agri_sensitivity_ratio' in a
+
+    def test_identical_segment_sensitivity_gives_a_ratio_of_one(self, suite_results):
+        # Both segments share the same PD, LGD and multiplier, so they move together.
+        a = assess_portfolio_vulnerability(suite_results)
+        assert a['agri_sensitivity_ratio'] == pytest.approx(1.0)
+
+    def test_custom_baseline_name(self, small_portfolio):
+        scenarios = {
+            'Today': {'income_change': 0.0, 'dti_change': 0.0},
+            'Bad': {'income_change': -0.2, 'dti_change': 0.2},
+        }
+        res = calculate_stress_changes(run_all_scenarios(small_portfolio, scenarios), baseline_scenario='Today')
+        assert res['Today']['total_ecl_change'] == 0
+        assert res['Bad']['total_ecl_change'] > 0
