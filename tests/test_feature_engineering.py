@@ -13,7 +13,13 @@ from src.feature_engineering import (
     create_derived_features,
     encode_fico_bucket,
     encode_emp_length,
-    create_feature_matrix
+    create_feature_matrix,
+    create_loan_to_income_ratio,
+    create_income_per_dti,
+    encode_employment_length,
+    create_purpose_dummies,
+    create_home_ownership_dummies,
+    engineer_all_features
 )
 
 
@@ -157,3 +163,99 @@ class TestCreateFeatureMatrix:
         X, y = create_feature_matrix(sample_loan_data, features, 'Default')
 
         assert X.isna().sum().sum() == 0
+
+
+class TestRatioFeatures:
+
+    def test_loan_to_income_uses_income_plus_one(self):
+        df = pd.DataFrame({'loan_amnt': [1000.0], 'revenue': [99.0]})
+        assert create_loan_to_income_ratio(df)['loan_to_income'].iloc[0] == pytest.approx(10.0)
+
+    def test_infinite_ratio_is_replaced_by_the_median(self):
+        # revenue = -1 makes the denominator zero, so the raw ratio is inf.
+        df = pd.DataFrame({'loan_amnt': [100.0, 300.0, 500.0], 'revenue': [99.0, 299.0, -1.0]})
+        out = create_loan_to_income_ratio(df)
+        assert np.isfinite(out['loan_to_income']).all()
+        assert out['loan_to_income'].iloc[2] == pytest.approx(1.0)  # median of [1.0, 1.0]
+
+    def test_income_per_dti_uses_dti_plus_one(self):
+        df = pd.DataFrame({'revenue': [5000.0], 'dti_n': [4.0]})
+        assert create_income_per_dti(df)['income_per_dti'].iloc[0] == pytest.approx(1000.0)
+
+    def test_infinite_income_per_dti_is_replaced_by_the_median(self):
+        df = pd.DataFrame({'revenue': [100.0, 300.0, 50.0], 'dti_n': [1.0, 2.0, -1.0]})
+        out = create_income_per_dti(df)
+        assert np.isfinite(out['income_per_dti']).all()
+        assert out['income_per_dti'].iloc[2] == pytest.approx(75.0)  # median of [50, 100]
+
+    def test_ratio_helpers_do_not_modify_their_input(self):
+        df = pd.DataFrame({'loan_amnt': [1.0], 'revenue': [1.0], 'dti_n': [1.0]})
+        create_loan_to_income_ratio(df)
+        create_income_per_dti(df)
+        assert list(df.columns) == ['loan_amnt', 'revenue', 'dti_n']
+
+
+class TestEncodeEmploymentLength:
+
+    def test_known_labels_are_mapped(self):
+        df = pd.DataFrame({'emp_length': ['< 1 year', '1 year', '10+ years']})
+        out = encode_employment_length(df)
+        assert out['emp_length_num'].tolist() == [0.5, 1, 10]
+
+    def test_unknown_or_missing_labels_get_the_median(self):
+        df = pd.DataFrame({'emp_length': ['2 years', '4 years', 'n/a', None]})
+        out = encode_employment_length(df)
+        assert out['emp_length_num'].tolist() == [2, 4, 3, 3]
+
+
+class TestPurposeAndHomeDummies:
+
+    def test_rare_purposes_are_grouped_as_other(self):
+        df = pd.DataFrame({'purpose': ['a'] * 3 + ['b'] * 2 + ['c', 'd']})
+        out, cols = create_purpose_dummies(df, top_n=2)
+        assert sorted(cols) == ['purpose_a', 'purpose_b', 'purpose_other']
+        assert out['purpose_grouped'].tolist() == ['a'] * 3 + ['b'] * 2 + ['other', 'other']
+        assert out[cols].astype(int).sum(axis=1).eq(1).all()
+
+    def test_no_other_column_when_everything_is_in_the_top_n(self):
+        df = pd.DataFrame({'purpose': ['a', 'b', 'a']})
+        _, cols = create_purpose_dummies(df, top_n=5)
+        assert sorted(cols) == ['purpose_a', 'purpose_b']
+
+    def test_home_ownership_has_one_column_per_value(self):
+        df = pd.DataFrame({'home_ownership_n': ['RENT', 'OWN', 'RENT', 'MORTGAGE']})
+        out, cols = create_home_ownership_dummies(df)
+        assert sorted(cols) == ['home_MORTGAGE', 'home_OWN', 'home_RENT']
+        assert out['home_RENT'].astype(int).tolist() == [1, 0, 1, 0]
+
+
+class TestEngineerAllFeatures:
+
+    def test_returns_frame_and_the_two_feature_lists(self, sample_loan_data):
+        out, numeric, dummies = engineer_all_features(sample_loan_data)
+        assert len(out) == len(sample_loan_data)
+        assert {'loan_to_income', 'income_per_dti', 'fico_bucket_num', 'emp_length_num',
+                'is_agri_portfolio'} <= set(out.columns)
+        assert 'loan_to_income' in numeric and 'emp_length_num' in numeric
+        for col in dummies:
+            assert col in out.columns
+        assert any(c.startswith('purpose_') for c in dummies)
+        assert any(c.startswith('home_') for c in dummies)
+
+    def test_engineered_numeric_features_have_no_missing_values(self, sample_loan_data):
+        out, numeric, _ = engineer_all_features(sample_loan_data)
+        engineered = ['loan_to_income', 'income_per_dti', 'fico_bucket_num', 'emp_length_num']
+        assert not out[engineered].isna().any().any()
+
+
+class TestCreateFeatureMatrix:
+
+    def test_rows_missing_a_feature_or_the_target_are_dropped(self):
+        df = pd.DataFrame({
+            'f1': [1.0, np.nan, 3.0, 4.0],
+            'f2': [1.0, 2.0, 3.0, 4.0],
+            'y': [0, 1, np.nan, 1],
+        })
+        X, y = create_feature_matrix(df, ['f1', 'f2'], 'y')
+        assert X.index.tolist() == [0, 3]
+        assert y.tolist() == [0, 1]
