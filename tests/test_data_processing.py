@@ -14,7 +14,15 @@ from src.data_processing import (
     handle_missing_values,
     create_time_split,
     create_fico_buckets,
-    clean_loan_data
+    clean_loan_data,
+    validate_loan_amounts,
+    validate_fico_scores,
+    validate_income,
+    validate_dti,
+    create_income_buckets,
+    parse_issue_date,
+    get_data_summary,
+    load_loan_data
 )
 
 
@@ -164,3 +172,123 @@ class TestCleanLoanData:
         })
         out = clean_loan_data(df)
         assert out.index.tolist() == [0, 5]
+
+
+class TestValidators:
+    """Range checks used by clean_loan_data; the boundary values are the point."""
+
+    def test_loan_amount_must_be_positive(self):
+        df = pd.DataFrame({'loan_amnt': [-5, 0, 1, 5000]})
+        assert validate_loan_amounts(df)['loan_amnt'].tolist() == [1, 5000]
+
+    def test_fico_range_is_inclusive(self):
+        df = pd.DataFrame({'fico_n': [299, 300, 850, 851]})
+        assert validate_fico_scores(df)['fico_n'].tolist() == [300, 850]
+
+    def test_fico_range_is_configurable(self):
+        df = pd.DataFrame({'fico_n': [500, 600, 700]})
+        out = validate_fico_scores(df, min_score=600, max_score=650)
+        assert out['fico_n'].tolist() == [600]
+
+    def test_income_excludes_zero_and_includes_the_cap(self):
+        df = pd.DataFrame({'revenue': [0, 1, 10_000_000, 10_000_001]})
+        assert validate_income(df)['revenue'].tolist() == [1, 10_000_000]
+
+    def test_dti_drops_negative_and_caps_large_values(self):
+        df = pd.DataFrame({'dti_n': [-1, 0, 20, 500]})
+        out = validate_dti(df)
+        assert out['dti_n'].tolist()[:2] == [0, 20]
+        assert len(out) == 3
+        assert out['dti_n'].max() < 500
+
+    def test_validators_do_not_modify_their_input(self):
+        df = pd.DataFrame({'loan_amnt': [-5, 10]})
+        validate_loan_amounts(df)
+        assert df['loan_amnt'].tolist() == [-5, 10]
+
+    def test_rows_with_missing_values_are_dropped_not_kept(self):
+        """NaN compares False against every bound, so it must not slip through."""
+        df = pd.DataFrame({'fico_n': [np.nan, 700.0]})
+        assert validate_fico_scores(df)['fico_n'].tolist() == [700.0]
+
+
+class TestCleanLoanDataRequiredColumns:
+
+    def test_missing_required_values_are_dropped(self):
+        df = pd.DataFrame({
+            'loan_amnt': [10000, 10000],
+            'fico_n': [700, 700],
+            'revenue': [50000, 50000],
+            'dti_n': [20, 20],
+            'purpose': ['car', None],
+        })
+        out = clean_loan_data(df, required_columns=['purpose'])
+        assert out['purpose'].tolist() == ['car']
+
+
+class TestCreateIncomeBuckets:
+
+    @pytest.mark.parametrize('income, bucket', [
+        (1, '<$40K'),
+        (40000, '<$40K'),
+        (40001, '$40K-$60K'),
+        (100000, '$80K-$100K'),
+        (150000, '$100K-$150K'),
+        (150001, '>$150K'),
+    ])
+    def test_bucket_edges(self, income, bucket):
+        out = create_income_buckets(pd.DataFrame({'revenue': [income]}))
+        assert out['income_bucket'].iloc[0] == bucket
+
+    def test_input_is_not_modified(self):
+        df = pd.DataFrame({'revenue': [50000]})
+        create_income_buckets(df)
+        assert 'income_bucket' not in df.columns
+
+
+class TestParseIssueDate:
+
+    def test_year_and_month_are_extracted(self):
+        df = pd.DataFrame({'issue_d': ['Jan-2015', 'Dec-2016']})
+        out = parse_issue_date(df)
+        assert out['issue_year'].tolist() == [2015, 2016]
+        assert out['issue_month'].tolist() == [1, 12]
+
+    def test_unparseable_date_raises(self):
+        with pytest.raises(ValueError):
+            parse_issue_date(pd.DataFrame({'issue_d': ['not a date']}))
+
+
+class TestGetDataSummary:
+
+    def test_summary_values(self):
+        df = pd.DataFrame({
+            'loan_amnt': [1000.0, 3000.0],
+            'Default': [0, 1],
+            'fico_n': [700, 720],
+        })
+        summary = get_data_summary(df)
+        assert summary['total_loans'] == 2
+        assert summary['total_exposure'] == 4000.0
+        assert summary['default_rate'] == 0.5
+        assert summary['avg_fico'] == 710
+        assert summary['avg_loan_amount'] == 2000.0
+
+    def test_missing_columns_give_none(self):
+        summary = get_data_summary(pd.DataFrame({'x': [1]}))
+        assert summary['total_loans'] == 1
+        assert summary['default_rate'] is None
+        assert summary['avg_income'] is None
+
+
+class TestLoadLoanData:
+
+    def test_reads_a_csv(self, tmp_path):
+        path = tmp_path / 'loans.csv'
+        path.write_text('loan_amnt,fico_n' + chr(10) + '1000,700' + chr(10))
+        df = load_loan_data(str(path))
+        assert df.to_dict('records') == [{'loan_amnt': 1000, 'fico_n': 700}]
+
+    def test_missing_file_raises_file_not_found(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            load_loan_data(str(tmp_path / 'nope.csv'))
