@@ -194,7 +194,9 @@ def clean_loan_data(
         print(f"Dropped rows with missing values in required columns")
 
     print(f"Final shape: {df_clean.shape}")
-    print(f"Rows removed: {len(df) - len(df_clean):,} ({(len(df) - len(df_clean))/len(df)*100:.2f}%)")
+    removed = len(df) - len(df_clean)
+    pct_removed = removed / len(df) * 100 if len(df) else 0.0
+    print(f"Rows removed: {removed:,} ({pct_removed:.2f}%)")
 
     return df_clean
 

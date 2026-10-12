@@ -13,7 +13,8 @@ from src.data_processing import (
     clean_numeric_column,
     handle_missing_values,
     create_time_split,
-    create_fico_buckets
+    create_fico_buckets,
+    clean_loan_data
 )
 
 
@@ -142,3 +143,24 @@ class TestCreateTimeSplit:
 
         total_rows = len(train) + len(test)
         assert total_rows == len(sample_loan_data)
+
+
+class TestCleanLoanData:
+    """clean_loan_data chains the four validators."""
+
+    def test_empty_input_does_not_divide_by_zero(self):
+        """Regression: the summary line computed removed/len(df) and raised
+        ZeroDivisionError for an empty frame."""
+        empty = pd.DataFrame({'loan_amnt': [], 'fico_n': [], 'revenue': [], 'dti_n': []})
+        out = clean_loan_data(empty)
+        assert out.empty
+
+    def test_invalid_rows_are_removed_by_each_validator(self):
+        df = pd.DataFrame({
+            'loan_amnt': [10000, 0, 10000, 10000, 10000, 10000],
+            'fico_n': [700, 700, 200, 700, 700, 700],
+            'revenue': [50000, 50000, 50000, 0, 50000, 50000],
+            'dti_n': [20, 20, 20, 20, -1, 20],
+        })
+        out = clean_loan_data(df)
+        assert out.index.tolist() == [0, 5]
