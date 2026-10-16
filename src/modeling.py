@@ -282,6 +282,10 @@ def get_feature_importance(
     return importance_df
 
 
+# Metrics from evaluate_model where a smaller value is better.
+LOWER_IS_BETTER_METRICS = {'brier_score'}
+
+
 def select_best_model(
     models: Dict[str, Dict],
     metric: str = 'auc'
@@ -294,14 +298,24 @@ def select_best_model(
     models : Dict[str, Dict]
         Dictionary of model name to dict with 'model' and metrics.
     metric : str
-        Metric to use for selection.
+        Metric to use for selection. Higher is better, except for the
+        metrics in LOWER_IS_BETTER_METRICS (the Brier score).
 
     Returns
     -------
     Tuple[str, Dict]
         Name and info dict of the best model.
     """
-    best_name = max(models.keys(), key=lambda x: models[x].get(metric, 0))
+    # Error metrics such as the Brier score improve as they fall, so the best
+    # model is the one with the smallest value. A model that does not report
+    # the metric ranks last either way.
+    sign = -1.0 if metric in LOWER_IS_BETTER_METRICS else 1.0
+
+    def score(name: str) -> float:
+        value = models[name].get(metric)
+        return float('-inf') if value is None else sign * value
+
+    best_name = max(models.keys(), key=score)
     return best_name, models[best_name]
 
 

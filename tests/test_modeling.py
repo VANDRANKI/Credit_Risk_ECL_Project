@@ -210,3 +210,56 @@ class TestTimeBasedSplit:
 
         assert train_mask.sum() + test_mask.sum() == len(df)
         assert train_mask.sum() > 0
+
+
+class TestSelectBestModelDirection:
+    """Regression: selection always took the largest value, so asking for the
+    Brier score (lower is better) returned the worst-calibrated model."""
+
+    def test_brier_score_picks_the_lowest(self):
+        models = {
+            'calibrated': {'model': None, 'brier_score': 0.08},
+            'overconfident': {'model': None, 'brier_score': 0.19},
+        }
+
+        best_name, _ = select_best_model(models, metric='brier_score')
+
+        assert best_name == 'calibrated'
+
+    def test_gini_still_picks_the_highest(self):
+        models = {
+            'a': {'model': None, 'gini': 0.30},
+            'b': {'model': None, 'gini': 0.45},
+        }
+
+        assert select_best_model(models, metric='gini')[0] == 'b'
+
+    def test_model_missing_the_metric_ranks_last(self):
+        models = {
+            'no_metric': {'model': None},
+            'weak': {'model': None, 'gini': -0.05},
+        }
+
+        assert select_best_model(models, metric='gini')[0] == 'weak'
+
+    def test_model_missing_brier_does_not_win_as_zero(self):
+        models = {
+            'no_metric': {'model': None},
+            'measured': {'model': None, 'brier_score': 0.2},
+        }
+
+        assert select_best_model(models, metric='brier_score')[0] == 'measured'
+
+    def test_works_on_real_evaluate_model_output(self, sample_features):
+        X, y = sample_features
+        good = train_logistic_regression(X, y)
+        bad = train_logistic_regression(X * 0, y)
+        models = {}
+        for name, m, Xm in (('good', good, X), ('bad', bad, X * 0)):
+            models[name] = {'model': m, **evaluate_model(m, Xm, y)}
+
+        best_name, _ = select_best_model(models, metric='brier_score')
+
+        assert models[best_name]['brier_score'] == min(
+            v['brier_score'] for v in models.values()
+        )
