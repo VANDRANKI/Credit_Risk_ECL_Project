@@ -16,7 +16,12 @@ from src.modeling import (
     evaluate_model,
     get_feature_importance,
     select_best_model,
-    time_based_split
+    time_based_split,
+    scale_features,
+    predict_pd,
+    save_model,
+    load_model,
+    compare_models
 )
 
 
@@ -263,3 +268,96 @@ class TestSelectBestModelDirection:
         assert models[best_name]['brier_score'] == min(
             v['brier_score'] for v in models.values()
         )
+
+
+class TestScaleFeatures:
+    """Tests for scale_features function."""
+
+    def _frames(self):
+        X_train = pd.DataFrame({'a': [1.0, 2.0, 3.0, 4.0], 'b': [10.0, 10.0, 20.0, 20.0],
+                                'grade': ['A', 'B', 'A', 'B']})
+        X_test = pd.DataFrame({'a': [5.0, 6.0], 'b': [30.0, 10.0], 'grade': ['A', 'B']})
+        return X_train, X_test
+
+    def test_train_columns_are_standardised(self):
+        X_train, X_test = self._frames()
+        scaled_train, _, _ = scale_features(X_train, X_test, ['a', 'b'])
+
+        assert scaled_train['a'].mean() == pytest.approx(0.0, abs=1e-9)
+        assert scaled_train['a'].std(ddof=0) == pytest.approx(1.0)
+
+    def test_test_set_uses_training_statistics(self):
+        """Test data must be scaled with the training mean and std, not its own."""
+        X_train, X_test = self._frames()
+        _, scaled_test, scaler = scale_features(X_train, X_test, ['a', 'b'])
+
+        mean, std = X_train['a'].mean(), X_train['a'].std(ddof=0)
+        assert scaled_test['a'].tolist() == pytest.approx(
+            [(5.0 - mean) / std, (6.0 - mean) / std]
+        )
+        assert scaler.mean_[0] == pytest.approx(mean)
+
+    def test_other_columns_and_inputs_are_untouched(self):
+        X_train, X_test = self._frames()
+        original_train = X_train.copy()
+        scaled_train, scaled_test, _ = scale_features(X_train, X_test, ['a'])
+
+        assert scaled_train['grade'].tolist() == ['A', 'B', 'A', 'B']
+        assert scaled_test['b'].tolist() == [30.0, 10.0]
+        pd.testing.assert_frame_equal(X_train, original_train)
+
+
+class TestPredictPD:
+    """Tests for predict_pd function."""
+
+    def test_returns_positive_class_probability(self, sample_features):
+        X, y = sample_features
+        model = train_logistic_regression(X, y)
+
+        pd_hat = predict_pd(model, X)
+
+        assert pd_hat.shape == (len(X),)
+        np.testing.assert_allclose(pd_hat, model.predict_proba(X)[:, 1])
+
+
+class TestSaveAndLoadModel:
+    """Tests for save_model and load_model functions."""
+
+    def test_round_trip_keeps_predictions(self, sample_features, tmp_path):
+        X, y = sample_features
+        model = train_logistic_regression(X, y)
+        path = str(tmp_path / 'model.joblib')
+
+        save_model(model, path)
+        loaded = load_model(path)
+
+        np.testing.assert_allclose(loaded.predict_proba(X), model.predict_proba(X))
+
+    def test_loading_a_missing_file_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            load_model(str(tmp_path / 'missing.joblib'))
+
+
+class TestCompareModels:
+    """Tests for compare_models function."""
+
+    def test_one_row_per_model_indexed_by_name(self, sample_features):
+        X, y = sample_features
+        models = {
+            'logit': train_logistic_regression(X, y),
+            'xgb': train_xgboost(X, y),
+        }
+
+        table = compare_models(models, X, y)
+
+        assert list(table.index) == ['logit', 'xgb']
+        assert table.index.name == 'model'
+        assert {'auc', 'gini', 'brier_score'} <= set(table.columns)
+
+    def test_row_matches_evaluate_model(self, sample_features):
+        X, y = sample_features
+        model = train_logistic_regression(X, y)
+
+        table = compare_models({'logit': model}, X, y)
+
+        assert table.loc['logit', 'auc'] == pytest.approx(evaluate_model(model, X, y)['auc'])
